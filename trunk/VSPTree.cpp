@@ -1,5 +1,7 @@
 #include "VSPTree.h"
 
+#define VERSION "VSPTree 0.2"
+
 VSPTree::VSPTree( QString appPath,  QString argument) :
 	m_applicationPath( appPath ),
 	m_settings( appPath + "/VSPTree.ini", QSettings::IniFormat )
@@ -7,6 +9,12 @@ VSPTree::VSPTree( QString appPath,  QString argument) :
 
 	QStringList env = QProcess::systemEnvironment();
 	env.replaceInStrings(QRegExp("^PATH=(.*)", Qt::CaseInsensitive), "PATH=\\1;C:\\Program Files\\Microsoft Visual Studio 9.0\\Team Tools\\Performance Tools\\");
+	QDir dir("C:\\Program Files\\Microsoft Visual Studio 9.0\\Team Tools\\Performance Tools\\");
+	if ( !dir.exists() )
+	{
+		QMessageBox::critical(NULL,"Standalone Debugger not installed", "C:\\Program Files\\Microsoft Visual Studio 9.0\\Team Tools\\Performance Tools\\ does not exist");
+	}
+
 	m_process.setEnvironment(env);
 
 	if ( m_settings.contains("m_lastExe") ) 
@@ -17,6 +25,11 @@ VSPTree::VSPTree( QString appPath,  QString argument) :
 	if ( m_settings.contains("m_lastVSP") ) 
 	{
 		m_lastVSP = m_settings.value("m_lastVSP").toString();
+	}
+
+	if ( m_settings.contains("m_lastArguments") ) 
+	{
+		m_lastArguments = m_settings.value("m_lastArguments").toString();
 	}
 
 	m_log = new QTextEdit();
@@ -64,7 +77,7 @@ VSPTree::VSPTree( QString appPath,  QString argument) :
 	connect(FindInTreeAct, SIGNAL(triggered()), this, SLOT(FindInTree()));
 
 	this->setCentralWidget(m_tabWidget);
-	this->setWindowTitle("VSPTree 0.1");
+	this->setWindowTitle(VERSION);
 	this->resize(640,480);
 	this->show();
 
@@ -260,13 +273,29 @@ void VSPTree::StartProfiling()
 
 	m_lastExe = fileName;
 
+	bool ok;
+	QString argumentstext = QInputDialog::getText(this, "Arguments", "Arguments to pass to executable. Leave blank or cancel for nothing.", QLineEdit::Normal, m_lastArguments, &ok);
+	if (ok)
+	{
+		m_lastArguments = argumentstext;
+	}
+	else
+	{
+		return;
+	}
+
+
 	QString reportfileName = QFileDialog::getSaveFileName(0,"Report to save",m_lastVSP,"*.vsp");
 	if ( !fileName.isNull() && !reportfileName.isNull() )
 	{
 		m_lastVSP = reportfileName;
 		m_tabWidget->setCurrentWidget(m_log);
 		QStringList args;
-		args << "VsPerfCmd.exe" << "/start:sample" << QString("/output:\"") + reportfileName + QString("\"") << QString("/launch:\"") + fileName + QString("\"") ;
+		args << "VsPerfCmd.exe" 
+			<< "/start:sample" << QString("/output:\"") + reportfileName + QString("\"") 
+			<< QString("/launch:\"") + fileName + QString("\"")
+			<< QString("/ARGS:\"") + argumentstext + QString("\"")
+			;
 		Log(args.join(" "));
 		writeText("StartProfiling.bat", 
 			QString("SET PATH=%PATH%;C:\\Program Files\\Microsoft Visual Studio 9.0\\Team Tools\\Performance Tools\n") + QString("VsPerfCmd.exe -shutdown\n") + args.join(" ")
@@ -306,6 +335,7 @@ void VSPTree::closeEvent( QCloseEvent* e )
 	QSettings settings( m_applicationPath + "/VSPTree.ini", QSettings::IniFormat );
     settings.setValue( "m_lastExe", m_lastExe );
 	settings.setValue( "m_lastVSP", m_lastVSP );
+	settings.setValue( "m_lastArguments", m_lastArguments );
 	e->accept();
 }
 

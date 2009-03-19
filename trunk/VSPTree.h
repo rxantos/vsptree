@@ -31,6 +31,7 @@ private:
 	QHash<QTreeWidgetItem*, QTreeWidgetItem*> m_flatHash;
 	QString m_lastExe;
 	QString m_lastVSP;
+	QString m_lastArguments;
 	QString m_applicationPath;
 	QSettings m_settings;
 
