@@ -34,6 +34,7 @@ private:
 	QString m_lastArguments;
 	QString m_applicationPath;
 	QSettings m_settings;
+	QString m_profilerpath;
 
 protected:
 	void contextMenuEvent ( QContextMenuEvent * event );

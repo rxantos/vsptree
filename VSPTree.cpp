@@ -1,20 +1,30 @@
 #include "VSPTree.h"
 
-#define VERSION "VSPTree 0.2"
+#define VERSION "VSPTree 0.3"
+#define PATH32 "C:\\Program Files\\Microsoft Visual Studio 9.0\\Team Tools\\Performance Tools\\"
+#define PATH64 "C:\\Program Files (x86)\\Microsoft Visual Studio 9.0\\Team Tools\\Performance Tools\\"
 
 VSPTree::VSPTree( QString appPath,  QString argument) :
 	m_applicationPath( appPath ),
 	m_settings( appPath + "/VSPTree.ini", QSettings::IniFormat )
 { 
-
-	QStringList env = QProcess::systemEnvironment();
-	env.replaceInStrings(QRegExp("^PATH=(.*)", Qt::CaseInsensitive), "PATH=\\1;C:\\Program Files\\Microsoft Visual Studio 9.0\\Team Tools\\Performance Tools\\");
-	QDir dir("C:\\Program Files\\Microsoft Visual Studio 9.0\\Team Tools\\Performance Tools\\");
-	if ( !dir.exists() )
+	QDir dir(PATH32);
+	QDir dir2(PATH64);
+	if ( dir.exists() )
 	{
-		QMessageBox::critical(NULL,"Standalone Debugger not installed", "C:\\Program Files\\Microsoft Visual Studio 9.0\\Team Tools\\Performance Tools\\ does not exist");
+		m_profilerpath = PATH32;
+	}
+	else if ( dir2.exists() )
+	{
+		m_profilerpath = PATH64;
+	}
+	else
+	{
+		QMessageBox::critical(NULL,"Standalone Debugger not installed", "C:\\Program Files (x86)\\Microsoft Visual Studio 9.0\\Team Tools\\Performance Tools\\ does not exist");
 	}
 
+	QStringList env = QProcess::systemEnvironment();
+	env.replaceInStrings(QRegExp("^PATH=(.*)", Qt::CaseInsensitive), QString("PATH=\\1;") + m_profilerpath);
 	m_process.setEnvironment(env);
 
 	if ( m_settings.contains("m_lastExe") ) 
@@ -252,14 +262,14 @@ void VSPTree::GenerateReport(QString fileName)
 	m_tabWidget->setCurrentWidget(m_log);
 	QFileInfo fileInfo(fileName);
 	m_process.setWorkingDirectory(fileInfo.absolutePath());
-	m_process.start("C:\\Program Files\\Microsoft Visual Studio 9.0\\Team Tools\\Performance Tools\\VSPerfReport.exe", QStringList() << "/summary:all" << "/packsymbols" << "/XML" << fileName );
+	m_process.start(m_profilerpath + QString("VSPerfReport.exe"), QStringList() << "/summary:all" << "/packsymbols" << "/XML" << fileName );
 	m_process.waitForFinished(-1);
 }
 
 void VSPTree::StopProfiling()
 {
 	m_tabWidget->setCurrentWidget(m_log);
-	m_process.start("C:\\Program Files\\Microsoft Visual Studio 9.0\\Team Tools\\Performance Tools\\VsPerfCmd.exe", QStringList() << "-shutdown" );
+	m_process.start(m_profilerpath + QString("VsPerfCmd.exe"), QStringList() << "-shutdown" );
 	m_process.waitForFinished();
 }
 
@@ -298,7 +308,7 @@ void VSPTree::StartProfiling()
 			;
 		Log(args.join(" "));
 		writeText("StartProfiling.bat", 
-			QString("SET PATH=%PATH%;C:\\Program Files\\Microsoft Visual Studio 9.0\\Team Tools\\Performance Tools\n") + QString("VsPerfCmd.exe -shutdown\n") + args.join(" ")
+			QString("SET PATH=%PATH%;") + m_profilerpath + QString("\n") + QString("VsPerfCmd.exe -shutdown\n") + args.join(" ")
 			);
 		m_process.startDetached("StartProfiling.bat",args);
 	}
