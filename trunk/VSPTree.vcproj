@@ -79,6 +79,7 @@
 				OutputFile="debug\VSPTree.exe"
 				SuppressStartupBanner="true"
 				AdditionalLibraryDirectories="$(QTDIR)\lib"
+				UACExecutionLevel="2"
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile=""
 				SubSystem="2"
@@ -170,6 +171,7 @@
 				LinkIncremental="1"
 				SuppressStartupBanner="true"
 				AdditionalLibraryDirectories="$(QTDIR)\lib"
+				UACExecutionLevel="2"
 				GenerateDebugInformation="false"
 				ProgramDatabaseFile=""
 				SubSystem="2"
@@ -180,7 +182,8 @@
 			/>
 			<Tool
 				Name="VCManifestTool"
-				ManifestResourceFile="$(SolutionDir)\$(TargetFileName).embed.manifest.res"
+				ManifestResourceFile="$(IntDir)\$(TargetFileName).embed.manifest.res"
+				AdditionalManifestFiles="$(SolutionDir)\$(TargetFileName).intermediate.manifest"
 			/>
 			<Tool
 				Name="VCXDCMakeTool"
