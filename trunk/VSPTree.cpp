@@ -1,6 +1,6 @@
 #include "VSPTree.h"
 
-#define VERSION "VSPTree 0.3"
+#define VERSION "VSPTree 0.4"
 #define PATH32 "C:\\Program Files\\Microsoft Visual Studio 9.0\\Team Tools\\Performance Tools\\"
 #define PATH64 "C:\\Program Files (x86)\\Microsoft Visual Studio 9.0\\Team Tools\\Performance Tools\\"
 

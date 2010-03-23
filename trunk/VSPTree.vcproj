@@ -4,7 +4,6 @@
 	Version="9.00"
 	Name="VSPTree"
 	ProjectGUID="{A60B3882-7A0B-320E-8110-E7F453773E6E}"
-	RootNamespace="VSPTree"
 	Keyword="Qt4VSv1.0"
 	TargetFrameworkVersion="0"
 	>
@@ -79,7 +78,6 @@
 				OutputFile="debug\VSPTree.exe"
 				SuppressStartupBanner="true"
 				AdditionalLibraryDirectories="$(QTDIR)\lib"
-				UACExecutionLevel="2"
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile=""
 				SubSystem="2"
@@ -182,8 +180,6 @@
 			/>
 			<Tool
 				Name="VCManifestTool"
-				ManifestResourceFile="$(IntDir)\$(TargetFileName).embed.manifest.res"
-				AdditionalManifestFiles="$(SolutionDir)\$(TargetFileName).intermediate.manifest"
 			/>
 			<Tool
 				Name="VCXDCMakeTool"
