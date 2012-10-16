@@ -1,8 +1,8 @@
 #include "VSPTree.h"
 
-#define VERSION "VSPTree 0.4"
-#define PATH32 "C:\\Program Files\\Microsoft Visual Studio 9.0\\Team Tools\\Performance Tools\\"
-#define PATH64 "C:\\Program Files (x86)\\Microsoft Visual Studio 9.0\\Team Tools\\Performance Tools\\"
+#define VERSION "VSPTree 0.5"
+#define PATH32 "C:\\Program Files\\Microsoft Visual Studio 10.0\\Team Tools\\Performance Tools\\"
+#define PATH64 "C:\\Program Files (x86)\\Microsoft Visual Studio 10.0\\Team Tools\\Performance Tools\\"
 
 VSPTree::VSPTree( QString appPath,  QString argument) :
 	m_applicationPath( appPath ),
@@ -20,7 +20,7 @@ VSPTree::VSPTree( QString appPath,  QString argument) :
 	}
 	else
 	{
-		QMessageBox::critical(NULL,"Standalone Debugger not installed", "C:\\Program Files (x86)\\Microsoft Visual Studio 9.0\\Team Tools\\Performance Tools\\ does not exist");
+		QMessageBox::critical(NULL,"Standalone Debugger not installed", "C:\\Program Files (x86)\\Microsoft Visual Studio 10.0\\Team Tools\\Performance Tools\\ does not exist");
 	}
 
 	QStringList env = QProcess::systemEnvironment();
