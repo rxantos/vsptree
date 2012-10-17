@@ -10,6 +10,21 @@
 #include <QString>
 #include <QSettings>
 #include <QDomDocument>
+#include <QThread>
+
+class VSPTreeThread : public QThread
+{
+Q_OBJECT
+public:
+	QProcess m_process;
+	QString m_fileName;
+	QString m_profilerpath;
+    void run();
+signals:
+	void output( QString output );
+private:
+	void log( QString input );
+};
 
 class VSPTree : public QMainWindow
 {
@@ -35,6 +50,10 @@ private:
 	QString m_applicationPath;
 	QSettings m_settings;
 	QString m_profilerpath;
+	QString m_editorPath;
+	QString m_editorArguments;
+	VSPTreeThread m_thread;
+	QMenuBar* menubar;
 
 protected:
 	void contextMenuEvent ( QContextMenuEvent * event );
@@ -52,8 +71,12 @@ protected slots:
 	void StdOutLog();
 	void StdErrorLog();
 	void StopProfiling();
+	void Profile();
 	void StartProfiling();
 	void FindInTree();
+	void openFile();
+	void setTextEditor();
+	void workDone();
 };
 
 

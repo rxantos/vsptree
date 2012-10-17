@@ -1,8 +1,9 @@
 #include "VSPTree.h"
+#include <QTest>
 
 #define VERSION "VSPTree 0.5"
-#define PATH32 "C:\\Program Files\\Microsoft Visual Studio 10.0\\Team Tools\\Performance Tools\\"
-#define PATH64 "C:\\Program Files (x86)\\Microsoft Visual Studio 10.0\\Team Tools\\Performance Tools\\"
+#define PATH32 "C:\\Program Files\\Microsoft Visual Studio 11.0\\Team Tools\\Performance Tools\\"
+#define PATH64 "C:\\Program Files (x86)\\Microsoft Visual Studio 11.0\\Team Tools\\Performance Tools\\"
 
 VSPTree::VSPTree( QString appPath,  QString argument) :
 	m_applicationPath( appPath ),
@@ -20,7 +21,7 @@ VSPTree::VSPTree( QString appPath,  QString argument) :
 	}
 	else
 	{
-		QMessageBox::critical(NULL,"Standalone Debugger not installed", "C:\\Program Files (x86)\\Microsoft Visual Studio 10.0\\Team Tools\\Performance Tools\\ does not exist");
+		QMessageBox::critical(NULL,"Standalone Debugger not installed", "C:\\Program Files (x86)\\Microsoft Visual Studio 11.0\\Team Tools\\Performance Tools\\ does not exist");
 	}
 
 	QStringList env = QProcess::systemEnvironment();
@@ -42,12 +43,24 @@ VSPTree::VSPTree( QString appPath,  QString argument) :
 		m_lastArguments = m_settings.value("m_lastArguments").toString();
 	}
 
+	m_editorPath = "";
+	if ( m_settings.contains("m_editorPath") ) 
+	{
+		m_editorPath = m_settings.value("m_editorPath").toString();
+	}
+
+	m_editorArguments = "<filename> -n<linenum>";
+	if ( m_settings.contains("m_editorArguments") ) 
+	{
+		m_editorArguments = m_settings.value("m_editorArguments").toString();
+	}
+
 	m_log = new QTextEdit();
 	m_log->setReadOnly(true);
 	connect (&m_process, SIGNAL(readyReadStandardOutput()),this,  SLOT(StdOutLog()));
 	connect (&m_process, SIGNAL(readyReadStandardError()),this,  SLOT(StdErrorLog()));
 
-	QMenuBar* menubar = this->menuBar();
+	menubar = this->menuBar();
 	QMenu* fileMenu = menubar->addMenu("File");
 	QAction* openAct = fileMenu->addAction("Open VSP");
 	connect(openAct, SIGNAL(triggered()), this, SLOT(LoadVSPClicked()));
@@ -56,11 +69,18 @@ VSPTree::VSPTree( QString appPath,  QString argument) :
 	
 	QMenu* profilerMenu = menubar->addMenu("Profiler");
 
-	QAction* startProfilingAct = profilerMenu->addAction("Start Profiler");
+	QAction* startProfilingAct = profilerMenu->addAction("Start Profiler Service");
 	connect(startProfilingAct, SIGNAL(triggered()), this, SLOT(StartProfiling()));
 
-	QAction* stopProfilingAct = profilerMenu->addAction("Stop Profiler");
+	QAction* ProfileAct = profilerMenu->addAction("Profile Application");
+	connect(ProfileAct, SIGNAL(triggered()), this, SLOT(Profile()));
+
+	QAction* stopProfilingAct = profilerMenu->addAction("Stop Profiler Service");
 	connect(stopProfilingAct, SIGNAL(triggered()), this, SLOT(StopProfiling()));
+
+	QMenu* OptionsMenu = menubar->addMenu("Options");
+	QAction* setTextEditor = OptionsMenu->addAction("Set Text Editor");
+	connect(setTextEditor, SIGNAL(triggered()), this, SLOT(setTextEditor()));
 
 	m_tabWidget = new QTabWidget();
 
@@ -76,6 +96,9 @@ VSPTree::VSPTree( QString appPath,  QString argument) :
 	m_tabWidget->addTab(m_log,"Log");
 
 	m_callTreeMenu = new QMenu();
+	QAction* openFileAct = m_callTreeMenu->addAction("Open File");
+	connect(openFileAct, SIGNAL(triggered()), this, SLOT(openFile()));
+
 	QAction* expandAllAct = m_callTreeMenu->addAction("Expand All");
 	connect(expandAllAct, SIGNAL(triggered()), m_callTreeWidget, SLOT(expandAll()));
 
@@ -83,8 +106,14 @@ VSPTree::VSPTree( QString appPath,  QString argument) :
 	connect(collapseAllAct, SIGNAL(triggered()), m_callTreeWidget, SLOT(collapseAll()));
 
 	m_flatCallTreeMenu = new QMenu();
+	
+	m_flatCallTreeMenu->addAction(openFileAct);
 	QAction* FindInTreeAct = m_flatCallTreeMenu->addAction("Find In Tree");
 	connect(FindInTreeAct, SIGNAL(triggered()), this, SLOT(FindInTree()));
+
+	//threads
+	connect( &m_thread, SIGNAL( output( QString ) ), this, SLOT( Log( QString ) ) );
+	connect( &m_thread, SIGNAL( finished() ), this, SLOT( workDone() ) );
 
 	this->setCentralWidget(m_tabWidget);
 	this->setWindowTitle(VERSION);
@@ -104,7 +133,7 @@ VSPTree::~VSPTree()
 
 void VSPTree::LoadVSPClicked()
 {
-	QString fileName = QFileDialog::getOpenFileName(0,"VSP to open",m_lastVSP,"*.vsp");
+	QString fileName = QFileDialog::getOpenFileName(0,"VSP to open",m_lastVSP,"*.vspx");
 	if ( !fileName.isNull() )
 	{
 		LoadVSP(fileName);
@@ -118,16 +147,7 @@ void VSPTree::LoadVSP(QString fileName)
 	m_functionSummaryTreeWidget->clear();
 
 	GenerateReport(fileName);
-
-	QFileInfo fileinfo(fileName);
-
 	m_lastVSP = fileName;
-
-	QString callTreeSummary = fileinfo.absolutePath() + "/" + fileinfo.baseName() + QString("_CallTreeSummary.xml");
-	LoadCallTree(callTreeSummary);
-
-	QString functionSummary = fileinfo.absolutePath() + "/" + fileinfo.baseName() + QString("_FunctionSummary.xml");
-	LoadFunctionSummary(functionSummary);
 }
 
 void VSPTree::LoadCallTree(QString callTreeSummary)
@@ -260,10 +280,11 @@ void VSPTree::contextMenuEvent ( QContextMenuEvent * event )
 void VSPTree::GenerateReport(QString fileName)
 {
 	m_tabWidget->setCurrentWidget(m_log);
-	QFileInfo fileInfo(fileName);
-	m_process.setWorkingDirectory(fileInfo.absolutePath());
-	m_process.start(m_profilerpath + QString("VSPerfReport.exe"), QStringList() << "/summary:all" << "/packsymbols" << "/XML" << fileName );
-	m_process.waitForFinished(-1);
+	m_thread.m_fileName = fileName;
+	m_thread.m_profilerpath = m_profilerpath;
+	m_tabWidget->setEnabled(false);
+	menubar->setEnabled(false);
+	m_thread.start();
 }
 
 void VSPTree::StopProfiling()
@@ -274,6 +295,14 @@ void VSPTree::StopProfiling()
 }
 
 void VSPTree::StartProfiling()
+{
+	m_tabWidget->setCurrentWidget(m_log);
+	QStringList args = QStringList() << "VsPerfMon.exe" << "/SAMPLE" << "/OUTPUT:" + QApplication::applicationDirPath() + "/dummy.vsp" ;
+	writeText("StartProfiling.bat", QString("SET PATH=%PATH%;") + m_profilerpath + QString("\n") + args.join(" ") );
+	m_process.startDetached("StartProfiling.bat");
+}
+
+void VSPTree::Profile()
 {
 	QString fileName = QFileDialog::getOpenFileName(0,"Executable to Profile",m_lastExe,"*.exe");
 	if ( fileName.isNull() ) 
@@ -294,23 +323,25 @@ void VSPTree::StartProfiling()
 		return;
 	}
 
-
-	QString reportfileName = QFileDialog::getSaveFileName(0,"Report to save",m_lastVSP,"*.vsp");
+	QString reportfileName = QFileDialog::getSaveFileName(0,"Report to save",m_lastVSP,"*.vspx");
 	if ( !fileName.isNull() && !reportfileName.isNull() )
 	{
 		m_lastVSP = reportfileName;
 		m_tabWidget->setCurrentWidget(m_log);
 		QStringList args;
-		args << "VsPerfCmd.exe" 
-			<< "/start:sample" << QString("/output:\"") + reportfileName + QString("\"") 
+		args << "VsPerf.exe" 
 			<< QString("/launch:\"") + fileName + QString("\"")
-			<< QString("/ARGS:\"") + argumentstext + QString("\"")
+			<< QString("/file:\"") + reportfileName + QString("\"") 
 			;
+		if( !argumentstext.isNull() )
+		{
+			args << QString("/args:\"") + argumentstext + QString("\"");
+		}
 		Log(args.join(" "));
-		writeText("StartProfiling.bat", 
-			QString("SET PATH=%PATH%;") + m_profilerpath + QString("\n") + QString("VsPerfCmd.exe -shutdown\n") + args.join(" ")
+		writeText("Profile.bat", 
+			"cd /d " + QFileInfo(fileName).absolutePath() + QString("\n") + QString("SET PATH=%PATH%;") + m_profilerpath + QString("\n") + args.join(" ")
 			);
-		m_process.startDetached("StartProfiling.bat",args);
+		m_process.startDetached("Profile.bat",args);
 	}
 }
 
@@ -322,16 +353,12 @@ void VSPTree::Log(QString text)
 
 void VSPTree::StdOutLog()
 {
-	Log("************ BEGIN *************");
 	Log(QString(m_process.readAllStandardOutput().data()));
-	Log("************* END **************");
 }
 
 void VSPTree::StdErrorLog()
 {
-	Log("************ BEGIN *************");
 	Log(QString(m_process.readAllStandardError().data()));
-	Log("************* END **************");
 }
 
 void VSPTree::FindInTree()
@@ -340,12 +367,48 @@ void VSPTree::FindInTree()
 	m_tabWidget->setCurrentWidget(m_callTreeWidget);
 }
 
+void VSPTree::openFile()
+{
+	if (m_editorPath.isEmpty())
+	{
+		setTextEditor();
+	}
+	if ( m_tabWidget->currentWidget() == m_callTreeWidget || m_tabWidget->currentWidget() == m_flatCallTreeWidget )
+	{	
+		QTreeWidget *currentTree = (QTreeWidget *)m_tabWidget->currentWidget();
+		if( currentTree->currentItem() != NULL )
+		{
+			QString fileName = currentTree->currentItem()->text(5);
+			QString lineNum = currentTree->currentItem()->text(6);
+			QProcess process;
+			QString tempString = m_editorArguments;
+			tempString.replace("<filename>", fileName);
+			tempString.replace("<linenum>", lineNum);
+			process.startDetached( m_editorPath, tempString.split(" ") );
+		}
+	}
+}
+
+void VSPTree::setTextEditor()
+{
+	m_editorPath = QFileDialog::getOpenFileName(0,"Where is your text editor?",m_editorPath,"*.exe");
+	if ( m_editorPath.isNull() ) 
+	{
+		return;
+	}
+
+	bool ok;
+	m_editorArguments = QInputDialog::getText(this, "Command line arguments", "Seperated by spaces. Use <filename> for filename and <linenum> for line number", QLineEdit::Normal, m_editorArguments, &ok);
+}
+
 void VSPTree::closeEvent( QCloseEvent* e )
 {
 	QSettings settings( m_applicationPath + "/VSPTree.ini", QSettings::IniFormat );
     settings.setValue( "m_lastExe", m_lastExe );
 	settings.setValue( "m_lastVSP", m_lastVSP );
 	settings.setValue( "m_lastArguments", m_lastArguments );
+	settings.setValue( "m_editorPath", m_editorPath );
+	settings.setValue( "m_editorArguments", m_editorArguments );
 	e->accept();
 }
 
@@ -381,4 +444,38 @@ QDomDocument VSPTree::readXML(QString filepath){
 	file.close();
 
 	return doc;
+}
+
+void VSPTree::workDone()
+{	
+	QFileInfo fileinfo(m_lastVSP);	
+
+	QString callTreeSummary = fileinfo.absolutePath() + "/" + fileinfo.baseName() + QString("_CallTreeSummary.xml");
+	LoadCallTree(callTreeSummary);
+
+	QString functionSummary = fileinfo.absolutePath() + "/" + fileinfo.baseName() + QString("_FunctionSummary.xml");
+	LoadFunctionSummary(functionSummary);
+	m_tabWidget->setEnabled(true);
+	menubar->setEnabled(true);
+}
+
+void VSPTreeThread::run()
+{
+	QFileInfo fileInfo(m_fileName);
+	m_process.setWorkingDirectory(fileInfo.absolutePath());
+	m_process.start(m_profilerpath + QString("VSPerfReport.exe"), QStringList() << "/summary:all" << "/packsymbols" << "/XML" << m_fileName );
+	while( m_process.state() == QProcess::Running )
+	{
+		if( m_process.waitForReadyRead() )
+		{
+			log( QString( m_process.readAllStandardOutput() ) );
+			log( QString( m_process.readAllStandardError() ) );
+		}
+		QTest::qSleep( 250 );
+	}
+}
+
+void VSPTreeThread::log( QString input )
+{
+	emit output( input );
 }
